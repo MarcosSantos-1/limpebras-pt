@@ -1,4 +1,4 @@
-// File: C:\Users\Admin\Desktop\Backup\Site do Plano de Trabalho\plano\app\layout.tsx
+// File: C:\Users\Admin\Desktop\Backup\Site do Plano de Trabalho\limpebras-pt\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

@@ -13,7 +13,7 @@ export default async function HomePage() {
   const data = await loadFeatureData();
 
   return (
-    <main className="flex min-h-screen w-full flex-col overflow-hidden bg-white">
+    <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white">
       <header className="mx-auto w-full max-w-5xl space-y-2 px-6 py-8">
         <p className="text-xs uppercase tracking-widest text-primary">
           Plano de Trabalho
@@ -27,7 +27,7 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <div className="flex flex-1 min-h-[calc(100vh-160px)]">
+      <div className="flex flex-1">
         <MapView data={data} />
       </div>
     </main>

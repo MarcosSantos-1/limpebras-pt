@@ -695,8 +695,14 @@ export function MapView({ data }: MapViewProps) {
           width: 260px;
         }
         .leaflet-control-layers-list {
-          overflow: visible;
-          max-height: none;
+          overflow-y: auto;
+          max-height: 320px;
+          padding-right: 2px;
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .leaflet-control-layers-list::-webkit-scrollbar {
+          display: none;
         }
         .leaflet-control-layers-base label,
         .leaflet-control-layers-overlays label {
