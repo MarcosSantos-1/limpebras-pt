@@ -416,7 +416,7 @@ export function MapView({ data }: MapViewProps) {
   );
 
   const searchErrorClass = clsx(
-    "absolute left-6 top-24 z-[1300] max-w-md rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow",
+    "absolute left-6 top-24 z-[1300] max-w-md rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200",
   );
 
   if (!L) {
@@ -452,7 +452,7 @@ export function MapView({ data }: MapViewProps) {
         <form
           onSubmit={handleSearch}
           className={clsx(
-            "flex items-center gap-2 overflow-hidden rounded-lg border border-slate-300 bg-white/95 px-0 py-1.5 shadow-inner transition-all duration-200",
+            "flex items-center gap-2 overflow-hidden rounded-lg border border-slate-300 bg-white/95 px-0 py-1.5 shadow-inner transition-all duration-200 dark:border-slate-600 dark:bg-slate-800/95",
             isSearchOpen
               ? "w-[360px] px-3 opacity-100"
               : "pointer-events-none w-0 border-transparent opacity-0",
@@ -464,7 +464,7 @@ export function MapView({ data }: MapViewProps) {
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Pesquisar endereço..."
             className={clsx(
-              "flex-1 rounded-md border-none bg-transparent text-sm text-slate-700 focus:outline-none focus:ring-0",
+              "flex-1 rounded-md border-none bg-transparent text-sm text-slate-700 focus:outline-none focus:ring-0 dark:text-slate-200 dark:placeholder:text-slate-400",
               isSearchOpen ? "pr-2" : "w-0",
             )}
             aria-hidden={!isSearchOpen}
