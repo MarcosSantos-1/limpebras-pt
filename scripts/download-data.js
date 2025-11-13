@@ -2,19 +2,23 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-// URLs dos arquivos LFS no GitHub
-const GITHUB_REPO = "MarcosSantos-1/limpebras-pt";
-const BRANCH = "master";
+// URLs dos arquivos - pode ser configurado via variável de ambiente
+const GITHUB_REPO = process.env.GITHUB_REPO || "MarcosSantos-1/limpebras-pt";
+const BRANCH = process.env.GITHUB_BRANCH || "master";
+const DATA_URL_PREFIX = process.env.DATA_URL_PREFIX; // Se configurado, usa URLs externas
+
 const LFS_FILES = [
   {
     name: "features.json",
     lfsPath: "data/features.json",
     localPath: path.join(process.cwd(), "data", "features.json"),
+    externalUrl: process.env.FEATURES_JSON_URL, // URL externa se disponível
   },
   {
     name: "addressIndex.json",
     lfsPath: "data/addressIndex.json",
     localPath: path.join(process.cwd(), "data", "addressIndex.json"),
+    externalUrl: process.env.ADDRESS_INDEX_URL, // URL externa se disponível
   },
 ];
 
@@ -87,35 +91,50 @@ async function downloadLFSFile(file) {
 
     // Verifica se arquivo já existe
     if (fs.existsSync(file.localPath)) {
-      console.log(`${file.name} já existe, pulando...`);
-      return;
-    }
-
-    // Tenta várias URLs possíveis
-    const urls = [
-      `https://github.com/${GITHUB_REPO}/raw/${BRANCH}/${file.lfsPath}`,
-      `https://raw.githubusercontent.com/${GITHUB_REPO}/${BRANCH}/${file.lfsPath}`,
-    ];
-
-    // Tenta obter URL via API
-    try {
-      const apiUrl = await getLFSDownloadUrl(file);
-      if (apiUrl) {
-        urls.unshift(apiUrl);
+      const stats = fs.statSync(file.localPath);
+      if (stats.size > 1000) { // Arquivo parece válido (> 1KB)
+        console.log(`${file.name} já existe (${(stats.size / 1024 / 1024).toFixed(2)} MB), pulando...`);
+        return;
       }
-    } catch (error) {
-      console.warn(`Não foi possível obter URL via API, usando URLs diretas`);
     }
+
+    // Prioriza URL externa se configurada
+    const urls = [];
+    if (file.externalUrl) {
+      urls.push(file.externalUrl);
+    }
+    if (DATA_URL_PREFIX) {
+      urls.push(`${DATA_URL_PREFIX}/${file.name}`);
+    }
+    
+    // URLs do GitHub (podem não funcionar para LFS)
+    urls.push(
+      `https://raw.githubusercontent.com/${GITHUB_REPO}/${BRANCH}/${file.lfsPath}`,
+      `https://github.com/${GITHUB_REPO}/raw/${BRANCH}/${file.lfsPath}`
+    );
 
     // Tenta baixar de cada URL
     let lastError = null;
     for (const url of urls) {
       try {
+        console.log(`Tentando baixar de: ${url.substring(0, 80)}...`);
         await downloadFile(url, file.localPath);
-        console.log(`✓ ${file.name} baixado com sucesso de ${url}`);
+        
+        // Verifica se o arquivo foi baixado corretamente
+        const stats = fs.statSync(file.localPath);
+        if (stats.size < 100) {
+          // Arquivo muito pequeno, provavelmente é um erro HTML
+          fs.unlinkSync(file.localPath);
+          throw new Error('Arquivo muito pequeno, provavelmente erro');
+        }
+        
+        console.log(`✓ ${file.name} baixado com sucesso (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
         return;
       } catch (error) {
         lastError = error;
+        if (fs.existsSync(file.localPath)) {
+          fs.unlinkSync(file.localPath);
+        }
         continue;
       }
     }
@@ -123,6 +142,11 @@ async function downloadLFSFile(file) {
     throw lastError || new Error('Todas as URLs falharam');
   } catch (error) {
     console.warn(`⚠ Não foi possível baixar ${file.name}:`, error.message);
+    console.warn(`  O app funcionará sem este arquivo. Para adicionar os dados:`);
+    console.warn(`  1. Faça upload dos arquivos para um storage externo (S3, etc)`);
+    console.warn(`  2. Configure as variáveis de ambiente na Vercel:`);
+    console.warn(`     - FEATURES_JSON_URL`);
+    console.warn(`     - ADDRESS_INDEX_URL`);
     // Não falha o build se não conseguir baixar - o app funcionará sem os dados
   }
 }
