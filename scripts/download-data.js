@@ -107,6 +107,13 @@ async function downloadLFSFile(file) {
       urls.push(`${DATA_URL_PREFIX}/${file.name}`);
     }
     
+    // Firebase Storage URLs (se configurado)
+    const firebaseBucket = process.env.FIREBASE_STORAGE_BUCKET;
+    if (firebaseBucket) {
+      urls.push(`https://storage.googleapis.com/${firebaseBucket}/${file.lfsPath}`);
+      urls.push(`https://firebasestorage.googleapis.com/v0/b/${firebaseBucket}/o/${encodeURIComponent(file.lfsPath)}?alt=media`);
+    }
+    
     // URLs do GitHub (podem não funcionar para LFS)
     urls.push(
       `https://raw.githubusercontent.com/${GITHUB_REPO}/${BRANCH}/${file.lfsPath}`,

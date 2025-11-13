@@ -7,7 +7,8 @@
     "prebuild": "node scripts/download-data.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "upload:firebase": "node scripts/upload-to-firebase.js"
   },
   "dependencies": {
     "clsx": "^2.0.0",
