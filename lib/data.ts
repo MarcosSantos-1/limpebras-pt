@@ -26,9 +26,17 @@ export async function loadFeatureData(): Promise<FeatureCollection> {
       services: {},
       center: [-23.55052, -46.633308],
       bounds: null,
+      addressIndex: [],
     };
   }
 
-  return data;
+  // Remove addressIndex do payload principal para reduzir tamanho
+  // O addressIndex será carregado apenas na API route
+  const { addressIndex, ...rest } = data;
+
+  return {
+    ...rest,
+    addressIndex: [], // Não carrega no cliente para reduzir tamanho
+  };
 }
 

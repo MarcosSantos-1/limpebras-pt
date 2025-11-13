@@ -21,6 +21,15 @@ export type FeatureRecord = {
   volumetria?: string | null;
 };
 
+export type AddressIndexEntry = {
+  logradouro: string;
+  normalized: string;
+  centroid: [number, number];
+  setor: string;
+  name: string;
+  subprefeitura?: string | null;
+};
+
 export type FeatureCollection = {
   services: Record<string, FeatureRecord[]>;
   center: [number, number];
@@ -30,5 +39,6 @@ export type FeatureCollection = {
     minLon: number;
     maxLon: number;
   } | null;
+  addressIndex?: AddressIndexEntry[];
 };
 

@@ -1,18 +1,27 @@
-import nextDynamic from "next/dynamic";
-import { loadFeatureData } from "@/lib/data";
-import { ThemeToggle } from "@/components/ThemeToggle";
+"use client";
 
-const MapView = nextDynamic(
+import { ThemeToggle } from "@/components/ThemeToggle";
+import dynamic from "next/dynamic";
+
+// Carrega MapView apenas no cliente para melhor performance
+const MapView = dynamic(
   () => import("@/components/MapView").then((mod) => mod.MapView),
-  { ssr: false },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-900">
+        <div className="text-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Carregando mapa...
+          </p>
+        </div>
+      </div>
+    ),
+  }
 );
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export default async function HomePage() {
-  const data = await loadFeatureData();
-
+export default function HomePage() {
   return (
     <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-slate-900">
       <header className="mx-auto w-full max-w-5xl space-y-2 bg-white px-6 py-8 dark:bg-slate-900">
@@ -44,7 +53,7 @@ export default async function HomePage() {
           <ThemeToggle />
         </div>
         <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
-          Visualize Plano de Trabalho em um Mapa Interativo
+          Visualize o Plano de Trabalho em um Mapa Interativo
         </h1>
         <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-400">
           Use o mapa para ativar camadas específicas, pesquisar endereços e
@@ -53,7 +62,7 @@ export default async function HomePage() {
       </header>
 
       <div className="flex flex-1 bg-white dark:bg-slate-900">
-        <MapView data={data} />
+        <MapView />
       </div>
     </main>
   );

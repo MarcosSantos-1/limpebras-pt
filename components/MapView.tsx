@@ -36,7 +36,7 @@ if (typeof window !== "undefined") {
 }
 
 type MapViewProps = {
-  data: FeatureCollection;
+  data?: FeatureCollection;
 };
 
 const { BaseLayer, Overlay } = LayersControl;
@@ -46,20 +46,330 @@ function normalizePopup(html?: string | null): string | undefined {
   return html.replace(/<table/g, "<table class='w-full text-sm'");
 }
 
-export function MapView({ data }: MapViewProps) {
-  const L = LeafletLib;
+// Componente de busca customizado que fica fora do mapa
+function SearchBar({
+  mapRef,
+  L,
+  searchMarkerIcon,
+}: {
+  mapRef: React.RefObject<Leaflet.Map | null>;
+  L: typeof Leaflet | undefined;
+  searchMarkerIcon: Leaflet.DivIcon | null;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Array<{
+    logradouro: string;
+    centroid: [number, number];
+    setor: string;
+    name: string;
+    subprefeitura?: string | null;
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const searchMarkerRef = useRef<Leaflet.Marker | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Busca local com debounce
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query || query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsSearching(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!response.ok) {
+          throw new Error("Erro na busca");
+        }
+        const data = await response.json();
+        setSuggestions(data.results || []);
+        setShowSuggestions((data.results || []).length > 0);
+        setSelectedIndex(-1);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+        console.warn("Erro ao buscar endereços:", error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+      setIsSearching(false);
+    };
+  }, [searchQuery]);
+
+  // Busca no Nominatim como fallback
+  const searchNominatim = async (query: string) => {
+    try {
+      const params = new URLSearchParams({
+        format: "json",
+        q: query + ", São Paulo, Brasil",
+        limit: "5",
+        addressdetails: "0",
+      });
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+        {
+          headers: {
+            "Accept-Language": "pt-BR",
+          },
+        },
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const results: Array<{
+        lat: string;
+        lon: string;
+        display_name?: string;
+      }> = await response.json();
+      return results.map((result) => ({
+        logradouro: result.display_name || query,
+        centroid: [Number(result.lat), Number(result.lon)] as [number, number],
+        setor: "",
+        name: result.display_name || query,
+        subprefeitura: null,
+      }));
+    } catch (error) {
+      console.warn("Erro ao buscar no Nominatim:", error);
+      return [];
+    }
+  };
+
+  // Seleciona endereço e faz zoom
+  const selectAddress = useCallback(
+    async (address: typeof suggestions[0]) => {
+      if (!mapRef.current || !L) {
+        return;
+      }
+
+      const destination = L.latLng(address.centroid[0], address.centroid[1]);
+      const map = mapRef.current;
+
+      // Faz zoom no endereço
+      map.setView(destination, 18, {
+        animate: true,
+        duration: 0.75,
+      });
+
+      // Remove marcador anterior se existir
+      if (searchMarkerRef.current) {
+        map.removeLayer(searchMarkerRef.current);
+        searchMarkerRef.current = null;
+      }
+
+      // Adiciona novo marcador
+      if (searchMarkerIcon) {
+        const marker = L.marker(destination, { icon: searchMarkerIcon }).addTo(map);
+        const popupText = address.subprefeitura
+          ? `${address.logradouro} - ${address.subprefeitura}`
+          : address.logradouro;
+        marker.bindPopup(popupText).openPopup();
+        searchMarkerRef.current = marker;
+      }
+
+      // Limpa busca
+      setSearchQuery("");
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    },
+    [mapRef, L, searchMarkerIcon],
+  );
+
+  // Handler de submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query || !mapRef.current || !L) {
+      return;
+    }
+
+    // Se houver sugestão selecionada, usa ela
+    if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      selectAddress(suggestions[selectedIndex]);
+      return;
+    }
+
+    // Se houver sugestões, usa a primeira
+    if (suggestions.length > 0) {
+      selectAddress(suggestions[0]);
+      return;
+    }
+
+    // Fallback: busca no Nominatim
+    setIsSearching(true);
+    try {
+      const nominatimResults = await searchNominatim(query);
+      if (nominatimResults.length > 0) {
+        selectAddress(nominatimResults[0]);
+      } else {
+        alert("Endereço não encontrado.");
+      }
+    } catch (error) {
+      console.warn("Erro ao buscar:", error);
+      alert("Não foi possível realizar a busca agora.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Navegação por teclado
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit(e);
+      return;
+    }
+
+    if (!showSuggestions || suggestions.length === 0) {
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+      setSearchQuery("");
+    }
+  };
+
+  return (
+    <div className="absolute left-6 top-6 z-[1000] w-[400px]" style={{ marginLeft: '60px' }}>
+      <form onSubmit={handleSubmit} className="relative">
+        <div className="flex items-center gap-2 rounded-lg border-2 border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
+          <input
+            ref={inputRef}
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              if (suggestions.length > 0) {
+                setShowSuggestions(true);
+              }
+            }}
+            onBlur={(e) => {
+              // Delay para permitir clicar nas sugestões
+              setTimeout(() => {
+                if (!e.currentTarget.contains(document.activeElement)) {
+                  setShowSuggestions(false);
+                }
+              }, 200);
+            }}
+            placeholder="Pesquisar endereço (ex: av ede 156)..."
+            className="flex-1 rounded-md border-none bg-transparent px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-0 dark:text-slate-200 dark:placeholder:text-slate-400"
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={isSearching || !searchQuery.trim()}
+            className="mr-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white uppercase tracking-wide shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSearching ? "..." : "Buscar"}
+          </button>
+        </div>
+
+        {/* Sugestões */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute left-0 top-full z-[1001] mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
+            <ul className="py-1">
+              {suggestions.map((suggestion, index) => (
+                <li key={`${suggestion.logradouro}-${index}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      selectAddress(suggestion);
+                      inputRef.current?.blur();
+                    }}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={clsx(
+                      "w-full px-4 py-3 text-left text-sm transition-colors",
+                      index === selectedIndex
+                        ? "bg-primary/20 text-primary dark:bg-primary/30 dark:text-blue-400"
+                        : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700",
+                    )}
+                  >
+                    <div className="font-medium">{suggestion.logradouro}</div>
+                    {suggestion.subprefeitura && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {suggestion.subprefeitura}
+                      </div>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Loading */}
+        {isSearching && searchQuery.trim().length >= 2 && (
+          <div className="absolute left-0 top-full z-[1001] mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-500 shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+              <span>Buscando endereços...</span>
+            </div>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}
+
+export function MapView({ data: initialData }: MapViewProps = {}) {
+  // Garante que só roda no cliente
+  const [isMounted, setIsMounted] = useState(false);
+  const [data, setData] = useState<FeatureCollection | null>(initialData || null);
+  const [isLoadingData, setIsLoadingData] = useState(!initialData);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // Carrega dados do cliente se não foram fornecidos
+    if (!initialData) {
+      setIsLoadingData(true);
+      fetch("/api/features")
+        .then((res) => res.json())
+        .then((loadedData) => {
+          setData(loadedData);
+          setIsLoadingData(false);
+        })
+        .catch((error) => {
+          console.error("Erro ao carregar dados:", error);
+          setIsLoadingData(false);
+        });
+    }
+  }, [initialData]);
+  
+  const L = isMounted ? LeafletLib : undefined;
   const mapRef = useRef<Leaflet.Map | null>(null);
   const iconCache = useRef<Map<string, Leaflet.DivIcon>>(new Map());
-  const searchMarkerRef = useRef<Leaflet.Marker | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [boundaryData, setBoundaryData] = useState<GeoJsonObject | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const searchMarkerIcon = useMemo<Leaflet.DivIcon | null>(() => {
-    if (!L) {
+    if (!isMounted || !L) {
       return null;
     }
     const html = renderToString(
@@ -91,54 +401,25 @@ export function MapView({ data }: MapViewProps) {
       iconAnchor: [16, 30],
       popupAnchor: [0, -28],
     });
-  }, [L]);
+  }, [L, isMounted]);
+
+  // placeSearchMarker removido - agora o geocoder gerencia seu próprio marcador
 
   useEffect(() => {
-    return () => {
-      const map = mapRef.current;
-      if (map && searchMarkerRef.current) {
-        map.removeLayer(searchMarkerRef.current);
-        searchMarkerRef.current = null;
-      }
-    };
-  }, []);
-
-  const placeSearchMarker = useCallback(
-    (position: Leaflet.LatLngExpression, popupText?: string) => {
-      const map = mapRef.current;
-      if (!map || !L || !searchMarkerIcon) {
-        return;
-      }
-      if (searchMarkerRef.current) {
-        map.removeLayer(searchMarkerRef.current);
-        searchMarkerRef.current = null;
-      }
-      const marker = L.marker(position, { icon: searchMarkerIcon }).addTo(map);
-      if (popupText) {
-        marker.bindPopup(popupText).openPopup();
-      }
-      searchMarkerRef.current = marker;
-    },
-    [searchMarkerIcon],
-  );
-
-  useEffect(() => {
-    if (!mapRef.current) {
+    if (!isMounted || !mapRef.current || !L) {
       return;
     }
     const timer = setTimeout(() => mapRef.current?.invalidateSize(), 200);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isMounted, L]);
+
+  // Geocoder será adicionado pelo componente GeocoderControl dentro do MapContainer
+
 
   useEffect(() => {
-    if (isSearchOpen) {
-      const timer = setTimeout(() => searchInputRef.current?.focus(), 150);
-      return () => clearTimeout(timer);
+    if (!isMounted) {
+      return;
     }
-    return undefined;
-  }, [isSearchOpen]);
-
-  useEffect(() => {
     const controller = new AbortController();
     const loadBoundary = async () => {
       try {
@@ -172,7 +453,7 @@ export function MapView({ data }: MapViewProps) {
     };
     loadBoundary();
     return () => controller.abort();
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
     if (!L) {
@@ -192,116 +473,10 @@ export function MapView({ data }: MapViewProps) {
     }
   }, [L]);
 
-  useEffect(() => {
-    let geocoder: Leaflet.Control | undefined;
-    let cancelled = false;
-
-    const map = mapRef.current;
-    if (!map || !L) {
-      return undefined;
-    }
-
-    const loadGeocoder = async () => {
-      if (typeof window === "undefined") return;
-
-      try {
-        await import("leaflet-control-geocoder/dist/Control.Geocoder.js");
-        if (cancelled) return;
-
-        // @ts-expect-error - plugin adds geocoder to the control namespace
-        const control = L.Control.geocoder({
-          defaultMarkGeocode: false,
-          placeholder: "Pesquisar endereço...",
-        })
-          .on("markgeocode", (event: any) => {
-            const center = event.geocode.center as Leaflet.LatLng;
-            const label = event.geocode.name ?? "Endereço";
-            map.setView(center, 17);
-            placeSearchMarker(center, label);
-          })
-          .addTo(map);
-
-        geocoder = control;
-      } catch (error) {
-        console.warn("Não foi possível inicializar o geocoder:", error);
-      }
-    };
-
-    loadGeocoder();
-
-    return () => {
-      cancelled = true;
-      if (geocoder && mapRef.current) {
-        mapRef.current.removeControl(geocoder);
-      }
-    };
-  }, [L, placeSearchMarker]);
-
-  const handleSearch = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!isSearchOpen) {
-        setIsSearchOpen(true);
-        return;
-      }
-      const query = searchQuery.trim();
-      if (!query || !mapRef.current || !L) {
-        return;
-      }
-      setIsSearching(true);
-      setSearchError(null);
-      try {
-        const params = new URLSearchParams({
-          format: "json",
-          q: query,
-          limit: "1",
-          addressdetails: "0",
-        });
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-          {
-            headers: {
-              "Accept-Language": "pt-BR",
-            },
-          },
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const results: Array<{
-          lat: string;
-          lon: string;
-          display_name?: string;
-        }> = await response.json();
-        if (results.length === 0) {
-          setSearchError("Endereço não encontrado.");
-          return;
-        }
-        const result = results[0];
-        const lat = Number(result.lat);
-        const lon = Number(result.lon);
-        if (Number.isNaN(lat) || Number.isNaN(lon)) {
-          setSearchError("Coordenadas inválidas retornadas pela busca.");
-          return;
-        }
-        const destination = L.latLng(lat, lon);
-        const map = mapRef.current;
-        if (map) {
-          map.flyTo(destination, 18, { duration: 0.75 });
-        }
-        placeSearchMarker(destination, result.display_name || "Endereço encontrado.");
-      } catch (error) {
-        console.warn("Erro ao buscar endereço:", error);
-        setSearchError("Não foi possível realizar a busca agora.");
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [searchQuery, placeSearchMarker, isSearchOpen, L],
-  );
+  // Busca customizada removida - usando apenas geocoder nativo do Leaflet (mais rápido)
 
   const bounds = useMemo(() => {
-    if (!L) {
+    if (!isMounted || !L || !data) {
       return null;
     }
     if (data.bounds) {
@@ -323,9 +498,12 @@ export function MapView({ data }: MapViewProps) {
     }
 
     return L.latLngBounds(points);
-  }, [data, L]);
+  }, [data, L, isMounted]);
 
   const services = useMemo(() => {
+    if (!data) {
+      return [];
+    }
     // Ordem customizada: escalonados primeiro (prioridade), depois os demais
     const ESCALONADO_ORDER = ["MT_ESC", "GO", "BL", "VJ_VL"];
     const entries = Object.entries(data.services).filter(([, features]) => features.length > 0);
@@ -358,20 +536,20 @@ export function MapView({ data }: MapViewProps) {
     
     // Retorna escalonados primeiro, depois os demais
     return [...escalonados, ...outros];
-  }, [data.services]);
+  }, [data]);
 
-  const mapCenter = useMemo(() => data.center ?? [-23.55052, -46.633308], [data.center]);
+  const mapCenter = useMemo(() => data?.center ?? [-23.55052, -46.633308], [data]);
 
   const getMarkerIcon = useCallback(
     (feature: FeatureRecord): Leaflet.DivIcon | null => {
+      if (!isMounted || !L) {
+        return null;
+      }
       const key =
         feature.service_icon ??
         feature.service_type_code ??
         feature.service_type ??
         "default";
-      if (!L) {
-        return null;
-      }
       if (!iconCache.current.has(key)) {
         const iconMeta = getServiceIconMeta(key);
         const html = renderToString(
@@ -395,7 +573,7 @@ export function MapView({ data }: MapViewProps) {
       }
       return iconCache.current.get(key)!;
     },
-    [L],
+    [L, isMounted],
   );
 
   const renderBaseLayerLabel = useCallback(
@@ -441,74 +619,31 @@ export function MapView({ data }: MapViewProps) {
   const mapWrapperClass = "flex-1 h-full w-full bg-black";
   const mapClass = "h-full w-full bg-black";
 
-  const actionBarClass = clsx(
-    "absolute left-20 right-6 top-3 z-[1300] flex flex-wrap items-center gap-2 ",
-  );
-
   const searchErrorClass = clsx(
-    "absolute left-6 top-24 z-[1300] max-w-md rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200",
+    "absolute left-6 top-6 z-[1300] max-w-md rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200",
   );
 
-  if (!L) {
-    return <div className={wrapperClass} />;
+  if (!isMounted || !L || isLoadingData || !data) {
+    return (
+      <div className={wrapperClass}>
+        <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-900">
+          <div className="text-center">
+            <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {isLoadingData ? "Carregando dados do mapa..." : "Carregando mapa..."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={wrapperClass}>
-      <div className={actionBarClass}>
-        <button
-          type="button"
-          onClick={() => setIsSearchOpen((prev) => !prev)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-primary/40 text-primary shadow-md backdrop-blur-sm transition hover:bg-primary/60 hover:shadow-lg"
-          aria-label={isSearchOpen ? "Fechar busca" : "Abrir busca"}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className={clsx(
-              "h-5 w-5 transition-transform duration-200",
-              isSearchOpen ? "scale-105" : "scale-100",
-            )}
-          >
-            <path
-              fillRule="evenodd"
-              d="M10.5 3a7.5 7.5 0 1 1 4.756 13.354l3.195 3.195a.75.75 0 1 1-1.06 1.06l-3.195-3.194A7.5 7.5 0 0 1 10.5 3Zm-6 7.5a6 6 0 1 1 12 0a6 6 0 0 1-12 0Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-
-        <form
-          onSubmit={handleSearch}
-          className={clsx(
-            "flex items-center gap-2 overflow-hidden rounded-lg border border-slate-300 bg-white/95 px-0 py-1.5 shadow-inner transition-all duration-200 dark:border-slate-600 dark:bg-slate-800/95",
-            isSearchOpen
-              ? "w-[360px] px-3 opacity-100"
-              : "pointer-events-none w-0 border-transparent opacity-0",
-          )}
-        >
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Pesquisar endereço..."
-            className={clsx(
-              "flex-1 rounded-md border-none bg-transparent text-sm text-slate-700 focus:outline-none focus:ring-0 dark:text-slate-200 dark:placeholder:text-slate-400",
-              isSearchOpen ? "pr-2" : "w-0",
-            )}
-            aria-hidden={!isSearchOpen}
-            ref={searchInputRef}
-          />
-          <button
-            type="submit"
-            disabled={isSearching || !isSearchOpen}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white uppercase tracking-wide shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSearching ? "Buscando..." : "Buscar"}
-          </button>
-        </form>
-      </div>
+      {/* Barra de busca fora do mapa */}
+      {L && searchMarkerIcon && (
+        <SearchBar mapRef={mapRef} L={L} searchMarkerIcon={searchMarkerIcon} />
+      )}
 
       {searchError && (
         <div className={searchErrorClass}>
@@ -525,8 +660,13 @@ export function MapView({ data }: MapViewProps) {
           ref={(instance) => {
             if (instance) {
               mapRef.current = instance;
+              // Aguarda um pouco e ajusta bounds se necessário
               if (bounds) {
+                setTimeout(() => {
+                  if (instance && bounds) {
                 instance.fitBounds(bounds, { padding: [24, 24] });
+                  }
+                }, 100);
               }
             }
           }}
