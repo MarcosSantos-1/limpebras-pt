@@ -34,30 +34,34 @@ async function initializeFirebase() {
     return admin.app();
   }
 
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || "limpebras-pt.firebasestorage.app";
+  
   // Tenta usar credenciais do arquivo
   const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (credentialsPath && fs.existsSync(credentialsPath)) {
-    const serviceAccount = require(credentialsPath);
+    const serviceAccount = require(path.resolve(credentialsPath));
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      storageBucket: storageBucket,
     });
   } else {
-    // Tenta usar variáveis de ambiente
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
-    
-    if (!projectId || !storageBucket) {
+    // Tenta usar variáveis de ambiente (para Vercel)
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (serviceAccountJson) {
+      try {
+        const serviceAccount = JSON.parse(serviceAccountJson);
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          storageBucket: storageBucket,
+        });
+      } catch (error) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT deve ser um JSON válido");
+      }
+    } else {
       throw new Error(
-        "Configure FIREBASE_PROJECT_ID e FIREBASE_STORAGE_BUCKET ou GOOGLE_APPLICATION_CREDENTIALS"
+        "Configure GOOGLE_APPLICATION_CREDENTIALS (caminho do arquivo) ou FIREBASE_SERVICE_ACCOUNT (JSON string)"
       );
     }
-
-    // Para usar variáveis de ambiente, você precisa configurar as credenciais
-    // Isso geralmente requer um arquivo JSON de credenciais
-    throw new Error(
-      "Configure GOOGLE_APPLICATION_CREDENTIALS com o caminho para o arquivo de credenciais JSON do Firebase"
-    );
   }
 
   return admin.app();
@@ -87,13 +91,7 @@ async function uploadFile(fileConfig) {
     // Torna o arquivo público
     await bucket.file(fileConfig.storagePath).makePublic();
 
-    // Obtém a URL pública
-    const [url] = await bucket.file(fileConfig.storagePath).getSignedUrl({
-      action: "read",
-      expires: "03-09-2491", // Data muito no futuro
-    });
-
-    // URL pública direta (sem assinatura)
+    // URL pública direta
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileConfig.storagePath}`;
     
     console.log(`✓ ${fileName} enviado com sucesso!`);

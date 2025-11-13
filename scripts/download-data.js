@@ -108,11 +108,9 @@ async function downloadLFSFile(file) {
     }
     
     // Firebase Storage URLs (se configurado)
-    const firebaseBucket = process.env.FIREBASE_STORAGE_BUCKET;
-    if (firebaseBucket) {
-      urls.push(`https://storage.googleapis.com/${firebaseBucket}/${file.lfsPath}`);
-      urls.push(`https://firebasestorage.googleapis.com/v0/b/${firebaseBucket}/o/${encodeURIComponent(file.lfsPath)}?alt=media`);
-    }
+    const firebaseBucket = process.env.FIREBASE_STORAGE_BUCKET || "limpebras-pt.firebasestorage.app";
+    urls.push(`https://storage.googleapis.com/${firebaseBucket}/${file.lfsPath}`);
+    urls.push(`https://firebasestorage.googleapis.com/v0/b/${firebaseBucket}/o/${encodeURIComponent(file.lfsPath)}?alt=media`);
     
     // URLs do GitHub (podem não funcionar para LFS)
     urls.push(
