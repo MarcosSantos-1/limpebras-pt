@@ -49,10 +49,33 @@ async function downloadFile(url, filepath) {
   });
 }
 
-async function downloadLFSFile(file) {
-  // Tenta baixar do GitHub LFS diretamente
-  const lfsUrl = `https://github.com/${GITHUB_REPO}/raw/${BRANCH}/${file.lfsPath}`;
+async function getLFSDownloadUrl(file) {
+  // Usa a API do GitHub para obter a URL de download do arquivo LFS
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${file.lfsPath}?ref=${BRANCH}`;
   
+  return new Promise((resolve, reject) => {
+    https.get(apiUrl, {
+      headers: {
+        'User-Agent': 'Node.js',
+        'Accept': 'application/vnd.github.v3.raw'
+      }
+    }, (response) => {
+      let data = '';
+      response.on('data', (chunk) => { data += chunk; });
+      response.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          // Se o arquivo é LFS, o download_url aponta para o arquivo LFS
+          resolve(json.download_url || json.git_lfs?.href);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+async function downloadLFSFile(file) {
   console.log(`Baixando ${file.name}...`);
   
   try {
@@ -68,11 +91,39 @@ async function downloadLFSFile(file) {
       return;
     }
 
-    await downloadFile(lfsUrl, file.localPath);
-    console.log(`✓ ${file.name} baixado com sucesso`);
+    // Tenta várias URLs possíveis
+    const urls = [
+      `https://github.com/${GITHUB_REPO}/raw/${BRANCH}/${file.lfsPath}`,
+      `https://raw.githubusercontent.com/${GITHUB_REPO}/${BRANCH}/${file.lfsPath}`,
+    ];
+
+    // Tenta obter URL via API
+    try {
+      const apiUrl = await getLFSDownloadUrl(file);
+      if (apiUrl) {
+        urls.unshift(apiUrl);
+      }
+    } catch (error) {
+      console.warn(`Não foi possível obter URL via API, usando URLs diretas`);
+    }
+
+    // Tenta baixar de cada URL
+    let lastError = null;
+    for (const url of urls) {
+      try {
+        await downloadFile(url, file.localPath);
+        console.log(`✓ ${file.name} baixado com sucesso de ${url}`);
+        return;
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+    }
+
+    throw lastError || new Error('Todas as URLs falharam');
   } catch (error) {
     console.warn(`⚠ Não foi possível baixar ${file.name}:`, error.message);
-    // Não falha o build se não conseguir baixar
+    // Não falha o build se não conseguir baixar - o app funcionará sem os dados
   }
 }
 
