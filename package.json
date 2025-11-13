@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "git lfs pull || echo 'Git LFS não disponível ou arquivos já baixados'",
+    "prebuild": "node scripts/download-data.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
