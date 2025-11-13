@@ -26,9 +26,9 @@ yarn-error.log*
 .vscode/
 .idea/
 
-# Arquivos grandes gerados pelo script.py (devem ser gerados localmente)
-data/features.json
-data/addressIndex.json
+# Arquivos grandes gerados pelo script.py (usando Git LFS)
+# data/features.json - agora usando Git LFS
+# data/addressIndex.json - agora usando Git LFS
 
 # Environment variables
 .env
