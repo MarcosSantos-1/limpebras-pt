@@ -346,8 +346,12 @@ export function MapView({ data: initialData }: MapViewProps = {}) {
   useEffect(() => {
     setIsMounted(true);
     
-    // Carrega dados do cliente se não foram fornecidos
-    if (!initialData) {
+    // Se dados já foram fornecidos via SSR, usa eles diretamente
+    if (initialData) {
+      setData(initialData);
+      setIsLoadingData(false);
+    } else {
+      // Fallback: carrega dados do cliente se não foram fornecidos
       setIsLoadingData(true);
       fetch("/api/features")
         .then((res) => res.json())

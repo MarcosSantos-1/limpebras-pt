@@ -1,10 +1,9 @@
-"use client";
-
 import { ThemeToggle } from "@/components/ThemeToggle";
-import dynamic from "next/dynamic";
+import { loadFeatureData } from "@/lib/data";
+import dynamicImport from "next/dynamic";
 
 // Carrega MapView apenas no cliente para melhor performance
-const MapView = dynamic(
+const MapView = dynamicImport(
   () => import("@/components/MapView").then((mod) => mod.MapView),
   {
     ssr: false,
@@ -21,7 +20,12 @@ const MapView = dynamic(
   }
 );
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function HomePage() {
+  // Carrega dados no servidor para já vir no HTML inicial
+  const initialData = await loadFeatureData();
   return (
     <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-slate-900">
       <header className="mx-auto w-full max-w-5xl space-y-2 bg-white px-6 py-8 dark:bg-slate-900">
@@ -61,9 +65,9 @@ export default function HomePage() {
         </p>
       </header>
 
-      <div className="flex flex-1 bg-white dark:bg-slate-900">
-        <MapView />
-      </div>
+            <div className="flex flex-1 bg-white dark:bg-slate-900">
+              <MapView data={initialData} />
+            </div>
     </main>
   );
 }
