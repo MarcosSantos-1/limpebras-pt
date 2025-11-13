@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+
 const ADDRESS_INDEX_PATH = path.join(process.cwd(), "data", "addressIndex.json");
 
 // Cache em memória para evitar ler o arquivo múltiplas vezes
@@ -43,9 +45,17 @@ async function loadAddressIndex(): Promise<Array<{
 
   try {
     const fileContent = await fs.readFile(ADDRESS_INDEX_PATH, "utf-8");
-    addressIndexCache = JSON.parse(fileContent);
+    const parsed = JSON.parse(fileContent) as Array<{
+      logradouro: string;
+      normalized: string;
+      centroid: [number, number];
+      setor: string;
+      name: string;
+      subprefeitura?: string | null;
+    }>;
+    addressIndexCache = parsed;
     cacheTimestamp = now;
-    return addressIndexCache;
+    return parsed;
   } catch (error) {
     console.error("Erro ao carregar índice de endereços:", error);
     throw error;
