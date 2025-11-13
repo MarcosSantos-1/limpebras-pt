@@ -325,10 +325,40 @@ export function MapView({ data }: MapViewProps) {
     return L.latLngBounds(points);
   }, [data, L]);
 
-  const services = useMemo(
-    () => Object.entries(data.services).filter(([, features]) => features.length > 0),
-    [data.services],
-  );
+  const services = useMemo(() => {
+    // Ordem customizada: escalonados primeiro (prioridade), depois os demais
+    const ESCALONADO_ORDER = ["MT_ESC", "GO", "BL", "VJ_VL"];
+    const entries = Object.entries(data.services).filter(([, features]) => features.length > 0);
+    
+    if (entries.length === 0) {
+      return [];
+    }
+    
+    // Separa escalonados e outros serviços
+    const escalonados: Array<[string, (typeof entries)[0][1]]> = [];
+    const outros: Array<[string, (typeof entries)[0][1]]> = [];
+    
+    entries.forEach(([key, features]) => {
+      if (ESCALONADO_ORDER.includes(key)) {
+        escalonados.push([key, features]);
+      } else {
+        outros.push([key, features]);
+      }
+    });
+    
+    // Ordena escalonados pela ordem definida
+    escalonados.sort((a, b) => {
+      const idxA = ESCALONADO_ORDER.indexOf(a[0]);
+      const idxB = ESCALONADO_ORDER.indexOf(b[0]);
+      return idxA - idxB;
+    });
+    
+    // Ordena outros serviços alfabeticamente
+    outros.sort((a, b) => a[0].localeCompare(b[0]));
+    
+    // Retorna escalonados primeiro, depois os demais
+    return [...escalonados, ...outros];
+  }, [data.services]);
 
   const mapCenter = useMemo(() => data.center ?? [-23.55052, -46.633308], [data.center]);
 
@@ -429,7 +459,7 @@ export function MapView({ data }: MapViewProps) {
         <button
           type="button"
           onClick={() => setIsSearchOpen((prev) => !prev)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/80 bg-primary/10 text-primary transition hover:bg-primary/20"
+          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-primary/40 text-primary shadow-md backdrop-blur-sm transition hover:bg-primary/60 hover:shadow-lg"
           aria-label={isSearchOpen ? "Fechar busca" : "Abrir busca"}
         >
           <svg
@@ -558,7 +588,7 @@ export function MapView({ data }: MapViewProps) {
                   <FeatureGroup>
                     {lineFeatures.map((feature: FeatureRecord) => {
                       const color = feature.lineColor || feature.fillColor || "#1f6feb";
-                      const weight = feature.lineWidth || 3;
+                      const weight = feature.lineWidth || 3.6;
                       return (
                         <Polyline
                           key={`${feature.service}-${feature.setor}-line`}

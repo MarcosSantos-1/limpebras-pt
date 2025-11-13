@@ -44,7 +44,7 @@ export default async function HomePage() {
           <ThemeToggle />
         </div>
         <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
-          Visualize os serviços em um painel interativo
+          Visualize Plano de Trabalho em um Mapa Interativo
         </h1>
         <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-400">
           Use o mapa para ativar camadas específicas, pesquisar endereços e
