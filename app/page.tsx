@@ -2,21 +2,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { loadFeatureData } from "@/lib/data";
 import dynamicImport from "next/dynamic";
 
-// Carrega MapView apenas no cliente para melhor performance
+// Carrega MapView apenas no cliente (Leaflet não funciona no servidor)
 const MapView = dynamicImport(
   () => import("@/components/MapView").then((mod) => mod.MapView),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-900">
-        <div className="text-center">
-          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Carregando mapa...
-          </p>
-        </div>
-      </div>
-    ),
+    // Não mostra loading se os dados já estão disponíveis
+    loading: () => null,
   }
 );
 

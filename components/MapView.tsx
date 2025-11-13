@@ -627,14 +627,31 @@ export function MapView({ data: initialData }: MapViewProps = {}) {
     "absolute left-6 top-6 z-[1300] max-w-md rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200",
   );
 
-  if (!isMounted || !L || isLoadingData || !data) {
+  // Só mostra loading se realmente estiver carregando (não se dados já vieram via SSR)
+  if (!isMounted || !L) {
     return (
       <div className={wrapperClass}>
         <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-900">
           <div className="text-center">
             <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {isLoadingData ? "Carregando dados do mapa..." : "Carregando mapa..."}
+              Carregando mapa...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem dados ainda, mostra loading apenas se realmente estiver carregando
+  if (!data && isLoadingData) {
+    return (
+      <div className={wrapperClass}>
+        <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-900">
+          <div className="text-center">
+            <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Carregando dados do mapa...
             </p>
           </div>
         </div>
