@@ -693,22 +693,11 @@ export function MapView({ data: initialData }: MapViewProps = {}) {
           }}
         >
           <LayersControl position="topright" collapsed={false}>
+            {/* Padrão: Satélite + Ruas (Esri) */}
             <BaseLayer
               checked
-              name={renderBaseLayerLabel("🗺️", "CartoDB Positron")}
+              name={renderBaseLayerLabel("🛰️", "Satélite + Ruas (Esri)")}
             >
-              <TileLayer
-                attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              />
-            </BaseLayer>
-            <BaseLayer name={renderBaseLayerLabel("🛰️", "Satélite (Esri)")}>
-              <TileLayer
-                attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>'
-                url="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              />
-            </BaseLayer>
-            <BaseLayer name={renderBaseLayerLabel("🛰️", "Satélite + Ruas (Esri)")}>
               <LayerGroup>
                 <TileLayer
                   attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>'
@@ -725,6 +714,41 @@ export function MapView({ data: initialData }: MapViewProps = {}) {
                   opacity={0.7}
                 />
               </LayerGroup>
+            </BaseLayer>
+            
+            <BaseLayer name={renderBaseLayerLabel("🛰️", "Satélite (Esri)")}>
+              <TileLayer
+                attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>'
+                url="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              />
+            </BaseLayer>
+            
+            <BaseLayer name={renderBaseLayerLabel("🗺️", "OpenStreetMap")}>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </BaseLayer>
+            
+            <BaseLayer name={renderBaseLayerLabel("🗺️", "CartoDB Positron")}>
+              <TileLayer
+                attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              />
+            </BaseLayer>
+            
+            <BaseLayer name={renderBaseLayerLabel("🌑", "CartoDB Dark Matter")}>
+              <TileLayer
+                attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              />
+            </BaseLayer>
+            
+            <BaseLayer name={renderBaseLayerLabel("🏔️", "Stamen Terrain")}>
+              <TileLayer
+                attribution='Map tiles by <a href="http://stamen.com">Stamen Design</a>'
+                url="https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png"
+              />
             </BaseLayer>
 
             {services.map(([serviceKey, features]) => {
