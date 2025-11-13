@@ -14,6 +14,28 @@ const admin = require("firebase-admin");
 const fs = require("fs");
 const path = require("path");
 
+// Carrega variáveis de ambiente do .env.local
+try {
+  const envPath = path.join(process.cwd(), ".env.local");
+  if (fs.existsSync(envPath)) {
+    const envFile = fs.readFileSync(envPath, "utf-8");
+    envFile.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join("=").trim();
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    });
+  }
+} catch (error) {
+  // Ignora erros ao carregar .env.local
+}
+
 // Configuração
 const FILES_TO_UPLOAD = [
   {
