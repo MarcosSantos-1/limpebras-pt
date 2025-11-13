@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { loadFeatureData } from "@/lib/data";
 
+// Força rota dinâmica para evitar pré-renderização (arquivo muito grande)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Cache em memória para evitar ler o arquivo múltiplas vezes
 let featuresCache: Awaited<ReturnType<typeof loadFeatureData>> | null = null;
 let cacheTimestamp = 0;
