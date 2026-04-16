@@ -23,8 +23,7 @@
         "fillColor": "#1f6feb",
         "lineColor": null,
         "lineWidth": null,
-        "geometry": "polygon",
-        "popupHtml": "<strong>Praça Exemplo</strong>"
+        "geometry": "polygon"
       }
     ]
   },

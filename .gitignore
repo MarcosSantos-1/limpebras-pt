@@ -37,6 +37,8 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Firebase credentials
+# Firebase credentials (nunca commitar)
 *-firebase-adminsdk*.json
 firebase-adminsdk*.json
+firebase-service-account.json
+*-service-account.json

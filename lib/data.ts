@@ -3,6 +3,7 @@ import path from "path";
 import type { FeatureCollection } from "./types";
 
 const DEFAULT_DATA_PATH = path.join(process.cwd(), "data", "features.json");
+const MANIFEST_PATH = path.join(process.cwd(), "data", "features-manifest.json");
 const SAMPLE_DATA_PATH = path.join(process.cwd(), "data", "features.sample.json");
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
@@ -14,29 +15,53 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
   }
 }
 
+const EMPTY: FeatureCollection = {
+  services: {},
+  center: [-23.491507, -46.610730],
+  bounds: null,
+  addressIndex: [],
+};
+
+/**
+ * Carga inicial leve: manifest (center/bounds/lista de serviços) ou JSON completo legado.
+ * Geometrias por serviço vêm de /api/features?service=... no cliente (lazy).
+ */
 export async function loadFeatureData(): Promise<FeatureCollection> {
-  const sourcePath = process.env.FEATURES_JSON_PATH ?? DEFAULT_DATA_PATH;
+  const explicit = process.env.FEATURES_JSON_PATH;
+  const primaryPath = explicit ?? DEFAULT_DATA_PATH;
 
-  const data =
-    (await readJsonFile<FeatureCollection>(sourcePath)) ??
-    (await readJsonFile<FeatureCollection>(SAMPLE_DATA_PATH));
-
-  if (!data) {
+  const fromPrimary = await readJsonFile<FeatureCollection>(primaryPath);
+  if (fromPrimary) {
+    const { addressIndex, ...rest } = fromPrimary as FeatureCollection & {
+      addressIndex?: unknown;
+    };
+    if (rest.splitByService && rest.serviceKeys?.length) {
+      return {
+        ...rest,
+        services: rest.services ?? {},
+        addressIndex: [],
+      };
+    }
     return {
-      services: {},
-      center: [-23.55052, -46.633308],
-      bounds: null,
+      ...rest,
       addressIndex: [],
     };
   }
 
-  // Remove addressIndex do payload principal para reduzir tamanho
-  // O addressIndex será carregado apenas na API route
-  const { addressIndex, ...rest } = data;
+  const manifest = await readJsonFile<FeatureCollection>(MANIFEST_PATH);
+  if (manifest?.splitByService && manifest.serviceKeys?.length) {
+    return {
+      ...manifest,
+      services: {},
+      addressIndex: [],
+    };
+  }
 
-  return {
-    ...rest,
-    addressIndex: [], // Não carrega no cliente para reduzir tamanho
-  };
+  const sample = await readJsonFile<FeatureCollection>(SAMPLE_DATA_PATH);
+  if (sample) {
+    const { addressIndex, ...rest } = sample;
+    return { ...rest, addressIndex: [] };
+  }
+
+  return EMPTY;
 }
-

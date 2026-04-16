@@ -53,6 +53,28 @@ const PinIcon = (
   </svg>
 );
 
+const RecycleIcon = (
+  <svg
+    className="h-5 w-5 text-green-600"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M21.82 15.42l-2.5-4.33a1 1 0 0 0-1.74 1l2.07 3.58H14.5a1 1 0 0 0 0 2h6.32a1 1 0 0 0 1-1.25zM9.73 3.07L7.23 7.4l2.5 4.33a1 1 0 0 0 1.74-1L9.4 7.14l2.5-4.33a1 1 0 0 0-.37-1.37 1 1 0 0 0-1.37.37l-.43.76zM5.93 16.75H3.86l2.5-4.33a1 1 0 0 0-1.74-1l-2.5 4.33A1 1 0 0 0 2.99 17h5.15l-1.54 2.67a1 1 0 0 0 1.74 1l2.5-4.33a1 1 0 0 0-.87-1.5H5.93z" />
+  </svg>
+);
+
+const WarningIcon = (
+  <svg
+    className="h-5 w-5 text-amber-500"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 16h2v2h-2v-2zm0-6h2v4h-2v-4z" />
+  </svg>
+);
+
 export const SERVICE_ICON_REGISTRY: Record<ServiceIconKey, ServiceIconMeta> = {
   water: {
     element: WaterIcon,
@@ -71,6 +93,18 @@ export const SERVICE_ICON_REGISTRY: Record<ServiceIconKey, ServiceIconMeta> = {
     bgClass: "bg-white",
     label: "Varrição de Praças",
     colorClass: "text-emerald-500",
+  },
+  warning: {
+    element: WarningIcon,
+    bgClass: "bg-amber-50",
+    label: "Pontos Viciados",
+    colorClass: "text-amber-500",
+  },
+  ecoponto: {
+    element: RecycleIcon,
+    bgClass: "bg-green-50",
+    label: "Ecopontos",
+    colorClass: "text-green-600",
   },
   default: {
     element: PinIcon,

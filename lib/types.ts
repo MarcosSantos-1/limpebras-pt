@@ -1,4 +1,5 @@
 export type FeatureRecord = {
+  id?: string;
   service: string;
   serviceDisplay?: string | null;
   setor: string;
@@ -17,8 +18,10 @@ export type FeatureRecord = {
   lineColor?: string | null;
   lineWidth?: number | null;
   geometry?: "polygon" | "line" | "point";
-  popupHtml?: string;
   volumetria?: string | null;
+  address?: string | null;
+  date?: string | null;
+  status?: string | null;
 };
 
 export type AddressIndexEntry = {
@@ -31,6 +34,10 @@ export type AddressIndexEntry = {
 };
 
 export type FeatureCollection = {
+  version?: number;
+  splitByService?: boolean;
+  serviceKeys?: string[];
+  serviceLabels?: Record<string, string>;
   services: Record<string, FeatureRecord[]>;
   center: [number, number];
   bounds?: {
@@ -41,4 +48,3 @@ export type FeatureCollection = {
   } | null;
   addressIndex?: AddressIndexEntry[];
 };
-
